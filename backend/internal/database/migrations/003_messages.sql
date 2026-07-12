@@ -4,7 +4,7 @@ CREATE TABLE messages (
     chat_id       UUID NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
     sender_id     UUID REFERENCES users(id) ON DELETE SET NULL,
     body          TEXT NOT NULL,
-    client_msg_id UUID NOT NULL,
+    client_msg_id TEXT NOT NULL,
     created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
 
     UNIQUE (chat_id, client_msg_id)
