@@ -1,0 +1,135 @@
+package httptransport
+
+import (
+	"net/http"
+
+	"github.com/ByakuByaku/realtime-chat-app/backend/internal/middleware"
+	"github.com/ByakuByaku/realtime-chat-app/backend/internal/models"
+)
+
+func (s *Server) handleGetChats(w http.ResponseWriter, r *http.Request) {
+	if !s.ensureMethod(w, r, http.MethodGet) {
+		return
+	}
+	if s.chats == nil {
+		writeNotImplemented(w, "chat service is not configured")
+		return
+	}
+
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeUnauthorized(w, "missing user context")
+		return
+	}
+
+	items, err := s.chats.GetChats(r.Context(), userID)
+	if err != nil {
+		handleServiceError(w, err)
+		return
+	}
+
+	response := ChatListResponse{Items: make([]ChatResponse, 0, len(items))}
+	for i := range items {
+		response.Items = append(response.Items, chatResponse(&items[i]))
+	}
+
+	writeJSON(w, http.StatusOK, response)
+}
+
+func (s *Server) handleCreateChat(w http.ResponseWriter, r *http.Request) {
+	if !s.ensureMethod(w, r, http.MethodPost) {
+		return
+	}
+	if s.chats == nil {
+		writeNotImplemented(w, "chat service is not configured")
+		return
+	}
+
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeUnauthorized(w, "missing user context")
+		return
+	}
+
+	var req CreateChatRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeBadRequest(w, err.Error())
+		return
+	}
+
+	createdBy := userID
+	chat, err := s.chats.CreateChat(r.Context(), req.Type, req.Title, &createdBy)
+	if err != nil {
+		handleServiceError(w, err)
+		return
+	}
+
+	if err := s.chats.AddMember(r.Context(), chat.ID, userID, models.ChatRoleAdmin); err != nil {
+		handleServiceError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, chatResponse(chat))
+}
+
+func (s *Server) handleAddMember(w http.ResponseWriter, r *http.Request) {
+	if !s.ensureMethod(w, r, http.MethodPost) {
+		return
+	}
+	if s.chats == nil {
+		writeNotImplemented(w, "chat service is not configured")
+		return
+	}
+
+	chatID, err := pathUUID(r, "chat_id")
+	if err != nil {
+		writeBadRequest(w, err.Error())
+		return
+	}
+
+	var req AddMemberRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeBadRequest(w, err.Error())
+		return
+	}
+
+	if err := s.chats.AddMember(r.Context(), chatID, req.UserID, req.Role); err != nil {
+		handleServiceError(w, err)
+		return
+	}
+
+	if req.Role == "" {
+		req.Role = models.ChatRoleMember
+	}
+
+	writeJSON(w, http.StatusCreated, ChatMemberResponse{ChatID: chatID, UserID: req.UserID, Role: req.Role})
+}
+
+func (s *Server) handleRemoveMember(w http.ResponseWriter, r *http.Request) {
+	if !s.ensureMethod(w, r, http.MethodDelete) {
+		return
+	}
+	if s.chats == nil {
+		writeNotImplemented(w, "chat service is not configured")
+		return
+	}
+
+	chatID, err := pathUUID(r, "chat_id")
+	if err != nil {
+		writeBadRequest(w, err.Error())
+		return
+	}
+
+	userID, err := pathUUID(r, "user_id")
+	if err != nil {
+		writeBadRequest(w, err.Error())
+		return
+	}
+
+	if err := s.chats.RemoveMember(r.Context(), chatID, userID); err != nil {
+		handleServiceError(w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
