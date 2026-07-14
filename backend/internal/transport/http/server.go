@@ -9,7 +9,8 @@ import (
 const apiPrefix = "/api/v1"
 
 type Server struct {
-	mux      *http.ServeMux
+	public   *http.ServeMux
+	protected *http.ServeMux
 	auth     *service.AuthService
 	chats    *service.ChatService
 	messages *service.MessageService
@@ -17,30 +18,38 @@ type Server struct {
 
 func NewServer(auth *service.AuthService, chats *service.ChatService, messages *service.MessageService) *Server {
 	s := &Server{
-		mux:      http.NewServeMux(),
+		public:   http.NewServeMux(),
+		protected: http.NewServeMux(),
 		auth:     auth,
 		chats:    chats,
 		messages: messages,
 	}
-	s.registerRoutes()
+	s.registerPublicRoutes()
+	s.registerProtectedRoutes()
 	return s
 }
 
-func (s *Server) Handler() http.Handler {
-	return s.mux
+func (s *Server) PublicHandler() http.Handler {
+	return s.public
 }
 
-func (s *Server) registerRoutes() {
-	s.mux.HandleFunc("POST "+apiPrefix+"/auth/register", s.handleRegister)
-	s.mux.HandleFunc("POST "+apiPrefix+"/auth/login", s.handleLogin)
+func (s *Server) ProtectedHandler() http.Handler {
+	return s.protected
+}
 
-	s.mux.HandleFunc("GET "+apiPrefix+"/chats", s.handleGetChats)
-	s.mux.HandleFunc("POST "+apiPrefix+"/chats", s.handleCreateChat)
-	s.mux.HandleFunc("POST "+apiPrefix+"/chats/{chat_id}/members", s.handleAddMember)
-	s.mux.HandleFunc("DELETE "+apiPrefix+"/chats/{chat_id}/members/{user_id}", s.handleRemoveMember)
-	s.mux.HandleFunc("GET "+apiPrefix+"/chats/{chat_id}/messages", s.handleGetMessages)
-	s.mux.HandleFunc("POST "+apiPrefix+"/chats/{chat_id}/messages", s.handleSendMessage)
-	s.mux.HandleFunc("GET "+apiPrefix+"/chats/{chat_id}/search", s.handleSearchMessages)
+func (s *Server) registerPublicRoutes() {
+	s.public.HandleFunc("POST "+apiPrefix+"/auth/register", s.handleRegister)
+	s.public.HandleFunc("POST "+apiPrefix+"/auth/login", s.handleLogin)
+}
+
+func (s *Server) registerProtectedRoutes() {
+	s.protected.HandleFunc("GET "+apiPrefix+"/chats", s.handleGetChats)
+	s.protected.HandleFunc("POST "+apiPrefix+"/chats", s.handleCreateChat)
+	s.protected.HandleFunc("POST "+apiPrefix+"/chats/{chat_id}/members", s.handleAddMember)
+	s.protected.HandleFunc("DELETE "+apiPrefix+"/chats/{chat_id}/members/{user_id}", s.handleRemoveMember)
+	s.protected.HandleFunc("GET "+apiPrefix+"/chats/{chat_id}/messages", s.handleGetMessages)
+	s.protected.HandleFunc("POST "+apiPrefix+"/chats/{chat_id}/messages", s.handleSendMessage)
+	s.protected.HandleFunc("GET "+apiPrefix+"/chats/{chat_id}/search", s.handleSearchMessages)
 }
 
 func (s *Server) ensureMethod(w http.ResponseWriter, r *http.Request, expected string) bool {
