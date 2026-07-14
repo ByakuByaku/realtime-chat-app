@@ -32,10 +32,11 @@ func New(cfg config.Config) (*App, error) {
 	}
 
 	usersRepo := repository.NewUserRepository(db)
+	refreshTokensRepo := repository.NewRefreshTokenRepository(db)
 	chatsRepo := repository.NewChatRepository(db)
 	messagesRepo := repository.NewMessageRepository(db)
 
-	authService := service.NewAuthService(usersRepo, cfg.JWTSecret, cfg.TokenTTL)
+	authService := service.NewAuthService(usersRepo, refreshTokensRepo, cfg.JWTSecret, cfg.TokenTTL, cfg.RefreshTokenTTL)
 	chatService := service.NewChatService(chatsRepo)
 	messageService := service.NewMessageService(messagesRepo)
 

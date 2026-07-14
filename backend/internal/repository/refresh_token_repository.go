@@ -69,6 +69,35 @@ func (r *RefreshTokenRepository) GetRefreshToken(ctx context.Context, id uuid.UU
 	return token, nil
 }
 
+func (r *RefreshTokenRepository) GetRefreshTokenByHash(ctx context.Context, tokenHash string) (*models.RefreshToken, error) {
+	token := &models.RefreshToken{}
+
+	query := `
+		SELECT id, user_id, token_hash, expires_at, revoked, created_at
+		FROM refresh_tokens
+		WHERE token_hash = $1
+		LIMIT 1
+	`
+
+	err := r.db.QueryRowContext(ctx, query, tokenHash).Scan(
+		&token.ID,
+		&token.UserID,
+		&token.TokenHash,
+		&token.ExpiresAt,
+		&token.Revoked,
+		&token.CreatedAt,
+	)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("refresh token not found")
+		}
+		return nil, fmt.Errorf("query refresh token by hash: %w", err)
+	}
+
+	return token, nil
+}
+
 func (r *RefreshTokenRepository) GetValidRefreshTokenByHash(ctx context.Context, tokenHash string) (*models.RefreshToken, error) {
 	token := &models.RefreshToken{}
 

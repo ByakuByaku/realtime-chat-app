@@ -95,6 +95,8 @@ func handleServiceError(w http.ResponseWriter, err error) {
 		writeUnauthorized(w, err.Error())
 	case errors.Is(err, service.ErrInvalidAuthInput):
 		writeBadRequest(w, err.Error())
+	case errors.Is(err, service.ErrInvalidRefreshToken):
+		writeUnauthorized(w, err.Error())
 	case errors.Is(err, repository.ErrUserNotFound):
 		writeJSON(w, http.StatusNotFound, ErrorResponse{Error: "not_found", Details: err.Error()})
 	case strings.Contains(err.Error(), "not found"):

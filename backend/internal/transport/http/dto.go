@@ -13,8 +13,13 @@ type AuthRequest struct {
 }
 
 type AuthResponse struct {
-	User        UserResponse `json:"user"`
-	AccessToken string       `json:"access_token"`
+	User         UserResponse `json:"user"`
+	AccessToken  string       `json:"access_token"`
+	RefreshToken string       `json:"refresh_token"`
+}
+
+type TokenRequest struct {
+	RefreshToken string `json:"refresh_token"`
 }
 
 type UserResponse struct {
@@ -29,12 +34,12 @@ type CreateChatRequest struct {
 }
 
 type ChatResponse struct {
-	ID            uuid.UUID      `json:"id"`
+	ID            uuid.UUID       `json:"id"`
 	Type          models.ChatType `json:"type"`
-	Title         *string        `json:"title,omitempty"`
-	CreatedBy     *uuid.UUID     `json:"created_by,omitempty"`
-	LastMessageAt *time.Time     `json:"last_message_at,omitempty"`
-	CreatedAt     time.Time      `json:"created_at"`
+	Title         *string         `json:"title,omitempty"`
+	CreatedBy     *uuid.UUID      `json:"created_by,omitempty"`
+	LastMessageAt *time.Time      `json:"last_message_at,omitempty"`
+	CreatedAt     time.Time       `json:"created_at"`
 }
 
 type ChatListResponse struct {
@@ -77,14 +82,15 @@ type ErrorResponse struct {
 	Details string `json:"details,omitempty"`
 }
 
-func authResponse(user *models.User, token string) AuthResponse {
+func authResponse(user *models.User, accessToken, refreshToken string) AuthResponse {
 	return AuthResponse{
 		User: UserResponse{
 			ID:        user.ID,
 			Login:     user.Login,
 			CreatedAt: user.CreatedAt,
 		},
-		AccessToken: token,
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
 	}
 }
 

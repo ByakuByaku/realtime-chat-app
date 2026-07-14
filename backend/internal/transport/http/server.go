@@ -9,20 +9,20 @@ import (
 const apiPrefix = "/api/v1"
 
 type Server struct {
-	public   *http.ServeMux
+	public    *http.ServeMux
 	protected *http.ServeMux
-	auth     *service.AuthService
-	chats    *service.ChatService
-	messages *service.MessageService
+	auth      *service.AuthService
+	chats     *service.ChatService
+	messages  *service.MessageService
 }
 
 func NewServer(auth *service.AuthService, chats *service.ChatService, messages *service.MessageService) *Server {
 	s := &Server{
-		public:   http.NewServeMux(),
+		public:    http.NewServeMux(),
 		protected: http.NewServeMux(),
-		auth:     auth,
-		chats:    chats,
-		messages: messages,
+		auth:      auth,
+		chats:     chats,
+		messages:  messages,
 	}
 	s.registerPublicRoutes()
 	s.registerProtectedRoutes()
@@ -40,6 +40,8 @@ func (s *Server) ProtectedHandler() http.Handler {
 func (s *Server) registerPublicRoutes() {
 	s.public.HandleFunc("POST "+apiPrefix+"/auth/register", s.handleRegister)
 	s.public.HandleFunc("POST "+apiPrefix+"/auth/login", s.handleLogin)
+	s.public.HandleFunc("POST "+apiPrefix+"/auth/refresh", s.handleRefresh)
+	s.public.HandleFunc("POST "+apiPrefix+"/auth/logout", s.handleLogout)
 }
 
 func (s *Server) registerProtectedRoutes() {
