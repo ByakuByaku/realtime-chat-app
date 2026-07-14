@@ -40,6 +40,45 @@ func (r *ChatRepository) CreateChat(ctx context.Context, chatType models.ChatTyp
 	return chat, nil
 }
 
+func (r *ChatRepository) AddMember(ctx context.Context, chatID, userID uuid.UUID, role models.ChatRole) error {
+	query := `
+		INSERT INTO chat_members (chat_id, user_id, role)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (chat_id, user_id)
+		DO UPDATE SET role = EXCLUDED.role
+	`
+
+	_, err := r.db.ExecContext(ctx, query, chatID, userID, role)
+	if err != nil {
+		return fmt.Errorf("insert chat member: %w", err)
+	}
+
+	return nil
+}
+
+func (r *ChatRepository) RemoveMember(ctx context.Context, chatID, userID uuid.UUID) error {
+	query := `
+		DELETE FROM chat_members
+		WHERE chat_id = $1 AND user_id = $2
+	`
+
+	result, err := r.db.ExecContext(ctx, query, chatID, userID)
+	if err != nil {
+		return fmt.Errorf("delete chat member: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("chat member not found")
+	}
+
+	return nil
+}
+
 func (r *ChatRepository) GetChatByID(ctx context.Context, id uuid.UUID) (*models.Chat, error) {
 	chat := &models.Chat{}
 

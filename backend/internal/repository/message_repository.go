@@ -82,3 +82,46 @@ func (r *MessageRepository) GetChatMessages(ctx context.Context, chatID uuid.UUI
 
 	return messages, nil
 }
+
+func (r *MessageRepository) SearchChatMessages(ctx context.Context, chatID uuid.UUID, queryText string, limit, offset int) ([]models.Message, error) {
+	query := `
+		SELECT id, chat_id, sender_id, body, client_msg_id, created_at
+		FROM messages
+		WHERE chat_id = $1 AND body ILIKE '%' || $2 || '%'
+		ORDER BY created_at DESC
+		LIMIT $3 OFFSET $4
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, chatID, queryText, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("query chat messages: %w", err)
+	}
+	defer rows.Close()
+
+	var messages []models.Message
+	for rows.Next() {
+		var msg models.Message
+		err := rows.Scan(
+			&msg.ID,
+			&msg.ChatID,
+			&msg.SenderID,
+			&msg.Body,
+			&msg.ClientMsgID,
+			&msg.CreatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("scan message: %w", err)
+		}
+		messages = append(messages, msg)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows error: %w", err)
+	}
+
+	for i, j := 0, len(messages)-1; i < j; i, j = i+1, j-1 {
+		messages[i], messages[j] = messages[j], messages[i]
+	}
+
+	return messages, nil
+}

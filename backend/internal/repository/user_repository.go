@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -13,6 +14,8 @@ import (
 type UserRepository struct {
 	db *sql.DB
 }
+
+var ErrUserNotFound = errors.New("user not found")
 
 func NewUserRepository(db *sql.DB) *UserRepository {
 	return &UserRepository{db: db}
@@ -57,7 +60,7 @@ func (r *UserRepository) GetUserByID(ctx context.Context, id uuid.UUID) (*models
 
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("user not found")
+			return nil, fmt.Errorf("%w", ErrUserNotFound)
 		}
 		return nil, fmt.Errorf("query user: %w", err)
 	}
@@ -83,7 +86,7 @@ func (r *UserRepository) GetUserByLogin(ctx context.Context, login string) (*mod
 
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("user not found")
+			return nil, fmt.Errorf("%w", ErrUserNotFound)
 		}
 		return nil, fmt.Errorf("query user: %w", err)
 	}
