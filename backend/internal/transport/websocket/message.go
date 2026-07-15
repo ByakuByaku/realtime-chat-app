@@ -15,6 +15,7 @@ type OutboundType string
 
 const (
 	OutboundTypeMessage OutboundType = "message"
+	OutboundTypeAck     OutboundType = "ack"
 	OutboundTypeError   OutboundType = "error"
 )
 
@@ -30,5 +31,6 @@ type MessagePayload struct {
 	SenderID    *uuid.UUID `json:"sender_id,omitempty"`
 	Body        string     `json:"body"`
 	ClientMsgID *string    `json:"client_msg_id,omitempty"`
+	Seq         int64      `json:"seq"`
 	CreatedAt   time.Time  `json:"created_at"`
 }
