@@ -12,5 +12,6 @@ type Message struct {
 	SenderID    *uuid.UUID
 	Body        string
 	ClientMsgID *string
+	Seq         int64
 	CreatedAt   time.Time
 }

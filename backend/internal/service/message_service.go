@@ -23,21 +23,32 @@ func NewMessageService(messages *repository.MessageRepository) *MessageService {
 	return &MessageService{messages: messages}
 }
 
-func (s *MessageService) SendMessage(ctx context.Context, chatID uuid.UUID, senderID *uuid.UUID, body string, clientMsgID *string) (*models.Message, error) {
+func (s *MessageService) SendMessage(ctx context.Context, chatID uuid.UUID, senderID *uuid.UUID, body string, clientMsgID *string) (*models.Message, bool, error) {
 	body = strings.TrimSpace(body)
 	if body == "" {
-		return nil, fmt.Errorf("message body is required")
+		return nil, false, fmt.Errorf("message body is required")
 	}
 	if clientMsgID == nil || strings.TrimSpace(*clientMsgID) == "" {
-		return nil, fmt.Errorf("client message id is required")
+		return nil, false, fmt.Errorf("client message id is required")
 	}
 
-	message, err := s.messages.CreateMessage(ctx, chatID, senderID, body, clientMsgID)
+	message, duplicate, err := s.messages.CreateMessage(ctx, chatID, senderID, body, clientMsgID)
 	if err != nil {
-		return nil, fmt.Errorf("send message: %w", err)
+		return nil, false, fmt.Errorf("send message: %w", err)
 	}
 
-	return message, nil
+	return message, duplicate, nil
+}
+
+func (s *MessageService) GetHistoryAfter(ctx context.Context, chatID uuid.UUID, afterSeq int64, limit int) ([]models.Message, error) {
+	limit, _ = normalizePaging(limit, 0)
+
+	messages, err := s.messages.GetChatMessagesAfterSeq(ctx, chatID, afterSeq, limit)
+	if err != nil {
+		return nil, fmt.Errorf("get history after seq: %w", err)
+	}
+
+	return messages, nil
 }
 
 func (s *MessageService) GetHistory(ctx context.Context, chatID uuid.UUID, limit, offset int) ([]models.Message, error) {
