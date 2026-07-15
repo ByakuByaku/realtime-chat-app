@@ -87,6 +87,18 @@ func (s *ChatService) requireAdmin(ctx context.Context, chatID, actorID uuid.UUI
 	return nil
 }
 
+func (s *ChatService) IsMember(ctx context.Context, chatID, userID uuid.UUID) (bool, error) {
+	_, err := s.chats.GetMemberRole(ctx, chatID, userID)
+	if err != nil {
+		if errors.Is(err, repository.ErrChatMemberNotFound) {
+			return false, nil
+		}
+		return false, fmt.Errorf("check chat membership: %w", err)
+	}
+
+	return true, nil
+}
+
 func (s *ChatService) GetChats(ctx context.Context, userID uuid.UUID) ([]models.Chat, error) {
 	chats, err := s.chats.GetUserChats(ctx, userID)
 	if err != nil {
