@@ -13,6 +13,7 @@ import (
 	"github.com/ByakuByaku/realtime-chat-app/backend/internal/repository"
 	"github.com/ByakuByaku/realtime-chat-app/backend/internal/service"
 	httptransport "github.com/ByakuByaku/realtime-chat-app/backend/internal/transport/http"
+	wstransport "github.com/ByakuByaku/realtime-chat-app/backend/internal/transport/websocket"
 )
 
 const (
@@ -42,12 +43,17 @@ func New(cfg config.Config) (*App, error) {
 
 	httpServer := httptransport.NewServer(authService, chatService, messageService)
 
+	hub := wstransport.NewHub()
+	go hub.Run()
+	wsServer := wstransport.NewServer(hub, chatService, messageService, cfg.JWTSecret)
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
 	})
 	mux.Handle("/api/v1/auth/", httpServer.PublicHandler())
+	mux.HandleFunc("GET /api/v1/chats/{chat_id}/ws", wsServer.HandleChatSocket)
 	mux.Handle("/api/v1/", middleware.Auth(cfg.JWTSecret)(httpServer.ProtectedHandler()))
 
 	server := &http.Server{
