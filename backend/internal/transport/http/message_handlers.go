@@ -69,13 +69,18 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	message, err := s.messages.SendMessage(r.Context(), chatID, &userID, req.Body, req.ClientMsgID)
+	message, duplicate, err := s.messages.SendMessage(r.Context(), chatID, &userID, req.Body, req.ClientMsgID)
 	if err != nil {
 		handleServiceError(w, err)
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, messageResponse(message))
+	status := http.StatusCreated
+	if duplicate {
+		status = http.StatusOK
+	}
+
+	writeJSON(w, status, messageResponse(message))
 }
 
 func (s *Server) handleSearchMessages(w http.ResponseWriter, r *http.Request) {

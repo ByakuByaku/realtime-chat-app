@@ -68,6 +68,7 @@ type MessageResponse struct {
 	SenderID    *uuid.UUID `json:"sender_id,omitempty"`
 	Body        string     `json:"body"`
 	ClientMsgID *string    `json:"client_msg_id,omitempty"`
+	Seq         int64      `json:"seq"`
 	CreatedAt   time.Time  `json:"created_at"`
 }
 
@@ -112,6 +113,7 @@ func messageResponse(message *models.Message) MessageResponse {
 		SenderID:    message.SenderID,
 		Body:        message.Body,
 		ClientMsgID: message.ClientMsgID,
+		Seq:         message.Seq,
 		CreatedAt:   message.CreatedAt,
 	}
 }
