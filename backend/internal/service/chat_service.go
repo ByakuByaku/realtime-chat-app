@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/ByakuByaku/realtime-chat-app/backend/internal/models"
@@ -10,6 +11,8 @@ import (
 )
 
 const defaultMemberRole = models.ChatRoleMember
+
+var ErrForbidden = errors.New("forbidden")
 
 type ChatService struct {
 	chats *repository.ChatRepository
@@ -29,10 +32,20 @@ func (s *ChatService) CreateChat(ctx context.Context, chatType models.ChatType, 
 		return nil, fmt.Errorf("create chat: %w", err)
 	}
 
+	if createdBy != nil {
+		if err := s.chats.AddMember(ctx, chat.ID, *createdBy, models.ChatRoleAdmin); err != nil {
+			return nil, fmt.Errorf("add chat creator as admin: %w", err)
+		}
+	}
+
 	return chat, nil
 }
 
-func (s *ChatService) AddMember(ctx context.Context, chatID, userID uuid.UUID, role models.ChatRole) error {
+func (s *ChatService) AddMember(ctx context.Context, actorID, chatID, userID uuid.UUID, role models.ChatRole) error {
+	if err := s.requireAdmin(ctx, chatID, actorID); err != nil {
+		return err
+	}
+
 	if role == "" {
 		role = defaultMemberRole
 	}
@@ -44,9 +57,31 @@ func (s *ChatService) AddMember(ctx context.Context, chatID, userID uuid.UUID, r
 	return nil
 }
 
-func (s *ChatService) RemoveMember(ctx context.Context, chatID, userID uuid.UUID) error {
+func (s *ChatService) RemoveMember(ctx context.Context, actorID, chatID, userID uuid.UUID) error {
+	if actorID != userID {
+		if err := s.requireAdmin(ctx, chatID, actorID); err != nil {
+			return err
+		}
+	}
+
 	if err := s.chats.RemoveMember(ctx, chatID, userID); err != nil {
 		return fmt.Errorf("remove chat member: %w", err)
+	}
+
+	return nil
+}
+
+func (s *ChatService) requireAdmin(ctx context.Context, chatID, actorID uuid.UUID) error {
+	role, err := s.chats.GetMemberRole(ctx, chatID, actorID)
+	if err != nil {
+		if errors.Is(err, repository.ErrChatMemberNotFound) {
+			return ErrForbidden
+		}
+		return fmt.Errorf("get member role: %w", err)
+	}
+
+	if role != models.ChatRoleAdmin {
+		return ErrForbidden
 	}
 
 	return nil

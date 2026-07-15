@@ -64,11 +64,6 @@ func (s *Server) handleCreateChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.chats.AddMember(r.Context(), chat.ID, userID, models.ChatRoleAdmin); err != nil {
-		handleServiceError(w, err)
-		return
-	}
-
 	writeJSON(w, http.StatusCreated, chatResponse(chat))
 }
 
@@ -78,6 +73,12 @@ func (s *Server) handleAddMember(w http.ResponseWriter, r *http.Request) {
 	}
 	if s.chats == nil {
 		writeNotImplemented(w, "chat service is not configured")
+		return
+	}
+
+	actorID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeUnauthorized(w, "missing user context")
 		return
 	}
 
@@ -93,7 +94,7 @@ func (s *Server) handleAddMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.chats.AddMember(r.Context(), chatID, req.UserID, req.Role); err != nil {
+	if err := s.chats.AddMember(r.Context(), actorID, chatID, req.UserID, req.Role); err != nil {
 		handleServiceError(w, err)
 		return
 	}
@@ -114,6 +115,12 @@ func (s *Server) handleRemoveMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	actorID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeUnauthorized(w, "missing user context")
+		return
+	}
+
 	chatID, err := pathUUID(r, "chat_id")
 	if err != nil {
 		writeBadRequest(w, err.Error())
@@ -126,7 +133,7 @@ func (s *Server) handleRemoveMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.chats.RemoveMember(r.Context(), chatID, userID); err != nil {
+	if err := s.chats.RemoveMember(r.Context(), actorID, chatID, userID); err != nil {
 		handleServiceError(w, err)
 		return
 	}

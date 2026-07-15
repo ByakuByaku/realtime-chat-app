@@ -3,12 +3,15 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/ByakuByaku/realtime-chat-app/backend/internal/models"
 	"github.com/google/uuid"
 )
+
+var ErrChatMemberNotFound = errors.New("chat member not found")
 
 type ChatRepository struct {
 	db *sql.DB
@@ -77,6 +80,26 @@ func (r *ChatRepository) RemoveMember(ctx context.Context, chatID, userID uuid.U
 	}
 
 	return nil
+}
+
+func (r *ChatRepository) GetMemberRole(ctx context.Context, chatID, userID uuid.UUID) (models.ChatRole, error) {
+	var role models.ChatRole
+
+	query := `
+		SELECT role
+		FROM chat_members
+		WHERE chat_id = $1 AND user_id = $2
+	`
+
+	err := r.db.QueryRowContext(ctx, query, chatID, userID).Scan(&role)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return "", ErrChatMemberNotFound
+		}
+		return "", fmt.Errorf("query chat member role: %w", err)
+	}
+
+	return role, nil
 }
 
 func (r *ChatRepository) GetChatByID(ctx context.Context, id uuid.UUID) (*models.Chat, error) {

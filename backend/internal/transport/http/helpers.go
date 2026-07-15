@@ -27,6 +27,10 @@ func writeUnauthorized(w http.ResponseWriter, details string) {
 	writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "unauthorized", Details: details})
 }
 
+func writeForbidden(w http.ResponseWriter, details string) {
+	writeJSON(w, http.StatusForbidden, ErrorResponse{Error: "forbidden", Details: details})
+}
+
 func writeNotImplemented(w http.ResponseWriter, details string) {
 	writeJSON(w, http.StatusNotImplemented, ErrorResponse{Error: "not_implemented", Details: details})
 }
@@ -97,6 +101,8 @@ func handleServiceError(w http.ResponseWriter, err error) {
 		writeBadRequest(w, err.Error())
 	case errors.Is(err, service.ErrInvalidRefreshToken):
 		writeUnauthorized(w, err.Error())
+	case errors.Is(err, service.ErrForbidden):
+		writeForbidden(w, err.Error())
 	case errors.Is(err, repository.ErrUserNotFound):
 		writeJSON(w, http.StatusNotFound, ErrorResponse{Error: "not_found", Details: err.Error()})
 	case strings.Contains(err.Error(), "not found"):
