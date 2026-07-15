@@ -1,7 +1,9 @@
 package websocket
 
 import (
+	"context"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/ByakuByaku/realtime-chat-app/backend/internal/models"
@@ -10,6 +12,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 )
+
+const backlogLimit = 200
 
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
@@ -51,6 +55,12 @@ func (s *Server) HandleChatSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	afterSeq, err := parseAfterSeq(r)
+	if err != nil {
+		http.Error(w, "after_seq must be an integer", http.StatusBadRequest)
+		return
+	}
+
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		return
@@ -58,7 +68,24 @@ func (s *Server) HandleChatSocket(w http.ResponseWriter, r *http.Request) {
 
 	client := NewClient(r.Context(), s.hub, conn, userID, chatID, s.handleInbound)
 	s.hub.Subscribe(chatID, client)
+
+	if afterSeq > 0 {
+		s.replayBacklog(r.Context(), client, chatID, afterSeq)
+	}
+
 	client.Run()
+}
+
+func (s *Server) replayBacklog(ctx context.Context, client *Client, chatID uuid.UUID, afterSeq int64) {
+	backlog, err := s.messages.GetHistoryAfter(ctx, chatID, afterSeq, backlogLimit)
+	if err != nil {
+		client.Enqueue(OutboundMessage{Type: OutboundTypeError, Error: "failed to load missed messages"})
+		return
+	}
+
+	for i := range backlog {
+		client.Enqueue(OutboundMessage{Type: OutboundTypeMessage, Message: payloadFromMessage(&backlog[i])})
+	}
 }
 
 func (s *Server) handleInbound(client *Client, msg InboundMessage) {
@@ -69,16 +96,20 @@ func (s *Server) handleInbound(client *Client, msg InboundMessage) {
 	}
 
 	senderID := client.UserID
-	message, err := s.messages.SendMessage(client.ctx, client.ChatID, &senderID, msg.Body, clientMsgID)
+	message, duplicate, err := s.messages.SendMessage(client.ctx, client.ChatID, &senderID, msg.Body, clientMsgID)
 	if err != nil {
 		client.Enqueue(OutboundMessage{Type: OutboundTypeError, Error: err.Error()})
 		return
 	}
 
-	s.hub.Broadcast(client.ChatID, OutboundMessage{
-		Type:    OutboundTypeMessage,
-		Message: payloadFromMessage(message),
-	})
+	payload := payloadFromMessage(message)
+	client.Enqueue(OutboundMessage{Type: OutboundTypeAck, Message: payload})
+
+	if duplicate {
+		return
+	}
+
+	s.hub.Broadcast(client.ChatID, OutboundMessage{Type: OutboundTypeMessage, Message: payload})
 }
 
 func payloadFromMessage(message *models.Message) *MessagePayload {
@@ -88,8 +119,18 @@ func payloadFromMessage(message *models.Message) *MessagePayload {
 		SenderID:    message.SenderID,
 		Body:        message.Body,
 		ClientMsgID: message.ClientMsgID,
+		Seq:         message.Seq,
 		CreatedAt:   message.CreatedAt,
 	}
+}
+
+func parseAfterSeq(r *http.Request) (int64, error) {
+	raw := strings.TrimSpace(r.URL.Query().Get("after_seq"))
+	if raw == "" {
+		return 0, nil
+	}
+
+	return strconv.ParseInt(raw, 10, 64)
 }
 
 func authenticate(r *http.Request, secret string) (uuid.UUID, error) {
