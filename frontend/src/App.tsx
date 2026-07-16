@@ -66,7 +66,7 @@ function chatTitle(chat: Chat, members: ChatMember[] = [], currentUserId?: strin
   }
 
   const other = members.find((member) => member.user_id !== currentUserId);
-  const name = other?.login || fallbackLabel || 'Личный чат';
+  const name = fallbackLabel || other?.login || 'Личный чат';
   return `Личный чат: ${name}`;
 }
 
@@ -787,6 +787,11 @@ function ChatPage() {
     ? chatTitle(currentChat, currentMembers, user?.id, currentMeta.label)
     : 'Чат';
 
+  const lastOtherMessageIndex = messages.reduce(
+    (lastIndex, item, index) => (item.sender_id !== user?.id ? index : lastIndex),
+    -1,
+  );
+
   return (
     <div className="shell">
       <header className="topbar">
@@ -806,16 +811,23 @@ function ChatPage() {
                 {loadingMore ? 'Загрузка...' : 'Загрузить более ранние сообщения'}
               </button>
             ) : null}
-            {messages.map((message) => (
-              <div key={message.id} className={`message-row ${message.sender_id === user?.id ? 'mine' : ''}`}>
-                <div className="message-bubble">
-                  <div>{message.body}</div>
-                  <small>
-                    {message.status === 'pending' ? 'Отправка...' : message.status === 'failed' ? 'Ошибка' : 'Доставлено'}
-                  </small>
+            {messages.map((message, index) => {
+              const isMine = message.sender_id === user?.id;
+              const supersededByReply = message.status !== 'pending' && message.status !== 'failed' && lastOtherMessageIndex > index;
+              const showStatus = isMine && !supersededByReply;
+              return (
+                <div key={message.id} className={`message-row ${isMine ? 'mine' : ''}`}>
+                  <div className="message-bubble">
+                    <div>{message.body}</div>
+                    {showStatus ? (
+                      <small>
+                        {message.status === 'pending' ? 'Отправка...' : message.status === 'failed' ? 'Ошибка' : 'Доставлено'}
+                      </small>
+                    ) : null}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <form className="composer" onSubmit={handleSend}>
