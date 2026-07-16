@@ -417,6 +417,7 @@ function ChatPage() {
   const [status, setStatus] = useState('Подключение...');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [accessDenied, setAccessDenied] = useState(false);
   const [historyOffset, setHistoryOffset] = useState(0);
   const [hasMoreHistory, setHasMoreHistory] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -485,6 +486,7 @@ function ChatPage() {
 
     const initialise = async () => {
       setLoading(true);
+      setAccessDenied(false);
       setHistoryOffset(0);
       setHasMoreHistory(true);
       try {
@@ -496,7 +498,12 @@ function ChatPage() {
         setHistoryOffset(history.length);
         setHasMoreHistory(history.length === MESSAGE_PAGE_SIZE);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Не удалось загрузить историю чата');
+        const message = err instanceof Error ? err.message : '';
+        if (message === 'forbidden' || message === 'not_found') {
+          setAccessDenied(true);
+        } else {
+          setError(message || 'Не удалось загрузить историю чата');
+        }
       } finally {
         setLoading(false);
       }
@@ -529,9 +536,12 @@ function ChatPage() {
   }, [chatId, hasMoreHistory, historyOffset, loadingMore, sortMessages]);
 
   useEffect(() => {
-    if (!chatId || !accessToken || !user?.id) {
+    if (!chatId || !accessToken || !user?.id || accessDenied) {
       return;
     }
+
+    let cancelled = false;
+    let reconnectTimer: number | undefined;
 
     const connect = () => {
       const afterSeq = latestSeqRef.current;
@@ -637,19 +647,26 @@ function ChatPage() {
       };
 
       socket.onclose = () => {
+        if (cancelled) {
+          return;
+        }
         setStatus('Переподключение...');
         const delay = Math.min(1000 * 2 ** reconnectRef.current, 4000);
         reconnectRef.current += 1;
-        window.setTimeout(() => connect(), delay);
+        reconnectTimer = window.setTimeout(() => connect(), delay);
       };
     };
 
     connect();
     return () => {
+      cancelled = true;
+      if (reconnectTimer) {
+        window.clearTimeout(reconnectTimer);
+      }
       socketRef.current?.close();
       socketRef.current = null;
     };
-  }, [accessToken, chatId, clearRetryTimer, sortMessages, user?.id]);
+  }, [accessToken, chatId, clearRetryTimer, sortMessages, user?.id, accessDenied]);
 
   useEffect(() => {
     return () => {
@@ -781,6 +798,18 @@ function ChatPage() {
 
   if (!chatId) {
     return <Navigate to="/" replace />;
+  }
+
+  if (accessDenied) {
+    return (
+      <div className="auth-shell">
+        <div className="card auth-card">
+          <h1>Чат не найден</h1>
+          <p className="empty">Возможно, он был удалён, или у вас больше нет к нему доступа.</p>
+          <button type="button" onClick={() => navigate('/')}>Вернуться назад</button>
+        </div>
+      </div>
+    );
   }
 
   const headerTitle = currentChat
