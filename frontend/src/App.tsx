@@ -30,6 +30,8 @@ type RichMessage = Message & {
   status?: 'pending' | 'sent' | 'failed';
 };
 
+const MESSAGE_PAGE_SIZE = 50;
+
 const AuthContext = createContext<AuthContextValue>({
   user: null,
   isAuthenticated: false,
@@ -415,6 +417,9 @@ function ChatPage() {
   const [status, setStatus] = useState('Подключение...');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [historyOffset, setHistoryOffset] = useState(0);
+  const [hasMoreHistory, setHasMoreHistory] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const socketRef = useRef<WebSocket | null>(null);
   const pendingRef = useRef<Map<string, RichMessage>>(new Map());
   const reconnectRef = useRef<number>(0);
@@ -467,11 +472,15 @@ function ChatPage() {
 
     const initialise = async () => {
       setLoading(true);
+      setHistoryOffset(0);
+      setHasMoreHistory(true);
       try {
-        const response = await api.getMessages(chatId, 50, 0);
+        const response = await api.getMessages(chatId, MESSAGE_PAGE_SIZE, 0);
         const history = (response.items ?? []).map((item: Message) => ({ ...item, status: 'sent' as const }));
         setMessages(sortMessages(history));
         latestSeqRef.current = history.length > 0 ? Math.max(...history.map((item: Message) => item.seq)) : 0;
+        setHistoryOffset(history.length);
+        setHasMoreHistory(history.length === MESSAGE_PAGE_SIZE);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Не удалось загрузить историю чата');
       } finally {
@@ -482,6 +491,28 @@ function ChatPage() {
     void initialise();
     void refreshChatMembers(chatId);
   }, [accessToken, chatId, refreshChatMembers, sortMessages, user?.id]);
+
+  const loadMoreHistory = useCallback(async () => {
+    if (!chatId || loadingMore || !hasMoreHistory) {
+      return;
+    }
+    setLoadingMore(true);
+    try {
+      const response = await api.getMessages(chatId, MESSAGE_PAGE_SIZE, historyOffset);
+      const older = (response.items ?? []).map((item: Message) => ({ ...item, status: 'sent' as const }));
+      setMessages((current) => {
+        const existingIds = new Set(current.map((item) => item.id));
+        const newOnes = older.filter((item) => !existingIds.has(item.id));
+        return sortMessages([...newOnes, ...current]);
+      });
+      setHistoryOffset((prev) => prev + older.length);
+      setHasMoreHistory(older.length === MESSAGE_PAGE_SIZE);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Не удалось загрузить историю чата');
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [chatId, hasMoreHistory, historyOffset, loadingMore, sortMessages]);
 
   useEffect(() => {
     if (!chatId || !accessToken || !user?.id) {
@@ -747,6 +778,11 @@ function ChatPage() {
         <section className="card chat-card">
           <div className="messages">
             {loading ? <p className="empty">Загрузка истории...</p> : null}
+            {!loading && hasMoreHistory ? (
+              <button type="button" className="secondary" onClick={() => void loadMoreHistory()} disabled={loadingMore}>
+                {loadingMore ? 'Загрузка...' : 'Загрузить более ранние сообщения'}
+              </button>
+            ) : null}
             {messages.map((message) => (
               <div key={message.id} className={`message-row ${message.sender_id === user?.id ? 'mine' : ''}`}>
                 <div className="message-bubble">
