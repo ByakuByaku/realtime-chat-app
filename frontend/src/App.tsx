@@ -448,6 +448,7 @@ function ChatPage() {
   ].filter(Boolean) as string[])).map((memberId) => ({
     chat_id: chatId ?? '',
     user_id: memberId,
+    login: undefined as string | undefined,
     role: memberId === currentChat?.created_by ? 'admin' as const : 'member' as const,
   }));
   const currentMembers = chatId && chatMembers[chatId]?.length ? chatMembers[chatId] : fallbackMembers;
@@ -844,15 +845,25 @@ function ChatPage() {
               const isMine = message.sender_id === user?.id;
               const supersededByReply = message.status !== 'pending' && message.status !== 'failed' && lastOtherMessageIndex > index;
               const showStatus = isMine && !supersededByReply;
+              const showSenderName =
+                currentChat?.type === 'group' &&
+                !isMine &&
+                (index === 0 || messages[index - 1].sender_id !== message.sender_id);
+              const senderName = showSenderName
+                ? currentMembers.find((member) => member.user_id === message.sender_id)?.login ?? 'Участник'
+                : null;
               return (
                 <div key={message.id} className={`message-row ${isMine ? 'mine' : ''}`}>
-                  <div className="message-bubble">
-                    <div>{message.body}</div>
-                    {showStatus ? (
-                      <small>
-                        {message.status === 'pending' ? 'Отправка...' : message.status === 'failed' ? 'Ошибка' : 'Доставлено'}
-                      </small>
-                    ) : null}
+                  <div className="message-stack">
+                    {senderName ? <div className="message-sender">{senderName}</div> : null}
+                    <div className="message-bubble">
+                      <div>{message.body}</div>
+                      {showStatus ? (
+                        <small>
+                          {message.status === 'pending' ? 'Отправка...' : message.status === 'failed' ? 'Ошибка' : 'Доставлено'}
+                        </small>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
               );
