@@ -2,8 +2,6 @@
 
 <img src="https://static.wikia.nocookie.net/logopedia/images/9/94/VK_Education.svg/revision/latest?cb=20230429123445" width="150" alt="VK Education">
 
-&nbsp;
-
 Мессенджер с чатами 1-на-1 и групповыми, доставкой сообщений в реальном времени через WebSocket, историей с пагинацией и поиском по тексту.
 
 Бэкенд на Go, фронтенд на React.
