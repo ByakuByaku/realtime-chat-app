@@ -67,7 +67,7 @@ func (s *Server) HandleChatSocket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	client := NewClient(r.Context(), s.hub, conn, userID, chatID, s.handleInbound)
-	s.hub.Subscribe(chatID, client)
+	s.hub.Subscribe(chatID, userID, client)
 
 	if afterSeq > 0 {
 		s.replayBacklog(r.Context(), client, chatID, afterSeq)

@@ -148,19 +148,29 @@ func (s *ChatService) GetChats(ctx context.Context, userID uuid.UUID) ([]models.
 	return chats, nil
 }
 
-func (s *ChatService) GetMembers(ctx context.Context, actorID, chatID uuid.UUID) ([]models.ChatMemberInfo, error) {
+func (s *ChatService) EnsureMember(ctx context.Context, actorID, chatID uuid.UUID) error {
 	member, err := s.IsMember(ctx, chatID, actorID)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	if !member {
-		chat, chatErr := s.chats.GetChatByID(ctx, chatID)
-		if chatErr != nil {
-			return nil, fmt.Errorf("get chat: %w", chatErr)
-		}
-		if chat.CreatedBy == nil || *chat.CreatedBy != actorID {
-			return nil, ErrForbidden
-		}
+	if member {
+		return nil
+	}
+
+	chat, err := s.chats.GetChatByID(ctx, chatID)
+	if err != nil {
+		return fmt.Errorf("get chat: %w", err)
+	}
+	if chat.CreatedBy == nil || *chat.CreatedBy != actorID {
+		return ErrForbidden
+	}
+
+	return nil
+}
+
+func (s *ChatService) GetMembers(ctx context.Context, actorID, chatID uuid.UUID) ([]models.ChatMemberInfo, error) {
+	if err := s.EnsureMember(ctx, actorID, chatID); err != nil {
+		return nil, err
 	}
 
 	members, err := s.chats.GetChatMembers(ctx, chatID)

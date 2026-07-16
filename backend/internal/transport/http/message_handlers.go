@@ -16,6 +16,12 @@ func (s *Server) handleGetMessages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	actorID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeUnauthorized(w, "missing user context")
+		return
+	}
+
 	chatID, err := pathUUID(r, "chat_id")
 	if err != nil {
 		writeBadRequest(w, err.Error())
@@ -28,7 +34,7 @@ func (s *Server) handleGetMessages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	items, err := s.messages.GetHistory(r.Context(), chatID, limit, offset)
+	items, err := s.messages.GetHistory(r.Context(), actorID, chatID, limit, offset)
 	if err != nil {
 		handleServiceError(w, err)
 		return
@@ -92,6 +98,12 @@ func (s *Server) handleSearchMessages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	actorID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeUnauthorized(w, "missing user context")
+		return
+	}
+
 	chatID, err := pathUUID(r, "chat_id")
 	if err != nil {
 		writeBadRequest(w, err.Error())
@@ -110,7 +122,7 @@ func (s *Server) handleSearchMessages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	items, err := s.messages.Search(r.Context(), chatID, query, limit, offset)
+	items, err := s.messages.Search(r.Context(), actorID, chatID, query, limit, offset)
 	if err != nil {
 		handleServiceError(w, err)
 		return

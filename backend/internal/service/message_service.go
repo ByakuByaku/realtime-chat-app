@@ -17,10 +17,11 @@ const (
 
 type MessageService struct {
 	messages *repository.MessageRepository
+	chats    *ChatService
 }
 
-func NewMessageService(messages *repository.MessageRepository) *MessageService {
-	return &MessageService{messages: messages}
+func NewMessageService(messages *repository.MessageRepository, chats *ChatService) *MessageService {
+	return &MessageService{messages: messages, chats: chats}
 }
 
 func (s *MessageService) SendMessage(ctx context.Context, chatID uuid.UUID, senderID *uuid.UUID, body string, clientMsgID *string) (*models.Message, bool, error) {
@@ -51,7 +52,11 @@ func (s *MessageService) GetHistoryAfter(ctx context.Context, chatID uuid.UUID, 
 	return messages, nil
 }
 
-func (s *MessageService) GetHistory(ctx context.Context, chatID uuid.UUID, limit, offset int) ([]models.Message, error) {
+func (s *MessageService) GetHistory(ctx context.Context, actorID, chatID uuid.UUID, limit, offset int) ([]models.Message, error) {
+	if err := s.chats.EnsureMember(ctx, actorID, chatID); err != nil {
+		return nil, err
+	}
+
 	limit, offset = normalizePaging(limit, offset)
 
 	messages, err := s.messages.GetChatMessages(ctx, chatID, limit, offset)
@@ -62,7 +67,11 @@ func (s *MessageService) GetHistory(ctx context.Context, chatID uuid.UUID, limit
 	return messages, nil
 }
 
-func (s *MessageService) Search(ctx context.Context, chatID uuid.UUID, query string, limit, offset int) ([]models.Message, error) {
+func (s *MessageService) Search(ctx context.Context, actorID, chatID uuid.UUID, query string, limit, offset int) ([]models.Message, error) {
+	if err := s.chats.EnsureMember(ctx, actorID, chatID); err != nil {
+		return nil, err
+	}
+
 	query = strings.TrimSpace(query)
 	if query == "" {
 		return nil, fmt.Errorf("search query is required")

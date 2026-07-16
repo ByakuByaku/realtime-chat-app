@@ -39,12 +39,12 @@ func New(cfg config.Config) (*App, error) {
 
 	authService := service.NewAuthService(usersRepo, refreshTokensRepo, cfg.JWTSecret, cfg.TokenTTL, cfg.RefreshTokenTTL)
 	chatService := service.NewChatService(chatsRepo)
-	messageService := service.NewMessageService(messagesRepo)
-
-	httpServer := httptransport.NewServer(authService, chatService, messageService)
+	messageService := service.NewMessageService(messagesRepo, chatService)
 
 	hub := wstransport.NewHub()
 	go hub.Run()
+
+	httpServer := httptransport.NewServer(authService, chatService, messageService, hub)
 	wsServer := wstransport.NewServer(hub, chatService, messageService, cfg.JWTSecret)
 
 	mux := http.NewServeMux()

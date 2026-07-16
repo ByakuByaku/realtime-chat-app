@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/ByakuByaku/realtime-chat-app/backend/internal/service"
+	wstransport "github.com/ByakuByaku/realtime-chat-app/backend/internal/transport/websocket"
 )
 
 const apiPrefix = "/api/v1"
@@ -14,15 +15,17 @@ type Server struct {
 	auth      *service.AuthService
 	chats     *service.ChatService
 	messages  *service.MessageService
+	hub       *wstransport.Hub
 }
 
-func NewServer(auth *service.AuthService, chats *service.ChatService, messages *service.MessageService) *Server {
+func NewServer(auth *service.AuthService, chats *service.ChatService, messages *service.MessageService, hub *wstransport.Hub) *Server {
 	s := &Server{
 		public:    http.NewServeMux(),
 		protected: http.NewServeMux(),
 		auth:      auth,
 		chats:     chats,
 		messages:  messages,
+		hub:       hub,
 	}
 	s.registerPublicRoutes()
 	s.registerProtectedRoutes()

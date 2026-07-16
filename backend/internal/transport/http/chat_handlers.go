@@ -210,5 +210,9 @@ func (s *Server) handleRemoveMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if s.hub != nil {
+		s.hub.DisconnectUser(chatID, userID)
+	}
+
 	w.WriteHeader(http.StatusNoContent)
 }

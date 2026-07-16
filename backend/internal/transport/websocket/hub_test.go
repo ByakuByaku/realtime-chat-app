@@ -25,7 +25,7 @@ func TestHubBroadcastDeliversToSubscriber(t *testing.T) {
 
 	chatID := uuid.New()
 	sub := newFakeSubscriber()
-	hub.Subscribe(chatID, sub)
+	hub.Subscribe(chatID, uuid.New(), sub)
 
 	hub.Broadcast(chatID, OutboundMessage{
 		Type:    OutboundTypeMessage,
@@ -48,7 +48,7 @@ func TestHubUnsubscribeStopsDelivery(t *testing.T) {
 
 	chatID := uuid.New()
 	sub := newFakeSubscriber()
-	hub.Subscribe(chatID, sub)
+	hub.Subscribe(chatID, uuid.New(), sub)
 	hub.Unsubscribe(chatID, sub)
 
 	hub.Broadcast(chatID, OutboundMessage{Type: OutboundTypeMessage})
@@ -66,13 +66,34 @@ func TestHubBroadcastOnlyReachesSubscribedChat(t *testing.T) {
 
 	chatA, chatB := uuid.New(), uuid.New()
 	sub := newFakeSubscriber()
-	hub.Subscribe(chatA, sub)
+	hub.Subscribe(chatA, uuid.New(), sub)
 
 	hub.Broadcast(chatB, OutboundMessage{Type: OutboundTypeMessage})
 
 	select {
 	case <-sub.received:
 		t.Fatal("received message for a chat it did not subscribe to")
+	case <-time.After(200 * time.Millisecond):
+	}
+}
+
+func TestHubDisconnectUserStopsDelivery(t *testing.T) {
+	hub := NewHub()
+	go hub.Run()
+
+	chatID := uuid.New()
+	userID := uuid.New()
+	sub := newFakeSubscriber()
+	hub.Subscribe(chatID, userID, sub)
+
+	hub.DisconnectUser(chatID, userID)
+	time.Sleep(50 * time.Millisecond)
+
+	hub.Broadcast(chatID, OutboundMessage{Type: OutboundTypeMessage})
+
+	select {
+	case <-sub.received:
+		t.Fatal("expected no message after disconnect")
 	case <-time.After(200 * time.Millisecond):
 	}
 }
