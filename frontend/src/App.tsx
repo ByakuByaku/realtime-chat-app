@@ -425,6 +425,19 @@ function ChatPage() {
   const reconnectRef = useRef<number>(0);
   const retryTimersRef = useRef<Map<string, number>>(new Map());
   const latestSeqRef = useRef<number>(0);
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
+  const pendingScrollRef = useRef(false);
+
+  useEffect(() => {
+    if (!pendingScrollRef.current) {
+      return;
+    }
+    pendingScrollRef.current = false;
+    const container = messagesContainerRef.current;
+    if (container) {
+      container.scrollTop = container.scrollHeight;
+    }
+  }, [messages]);
 
   const currentChat = chats.find((item) => item.id === chatId);
   const currentMeta = chatId ? (chatMeta[chatId] ?? { members: [] }) : { members: [] };
@@ -477,6 +490,7 @@ function ChatPage() {
       try {
         const response = await api.getMessages(chatId, MESSAGE_PAGE_SIZE, 0);
         const history = (response.items ?? []).map((item: Message) => ({ ...item, status: 'sent' as const }));
+        pendingScrollRef.current = true;
         setMessages(sortMessages(history));
         latestSeqRef.current = history.length > 0 ? Math.max(...history.map((item: Message) => item.seq)) : 0;
         setHistoryOffset(history.length);
@@ -538,6 +552,7 @@ function ChatPage() {
       socket.onmessage = (event) => {
         const frame = JSON.parse(event.data) as SocketMessageFrame;
         if (frame.type === 'ack' && frame.message?.client_msg_id) {
+          latestSeqRef.current = Math.max(latestSeqRef.current, frame.message.seq);
           setMessages((current) => {
             const next = current.map((item) => {
               if (item.client_msg_id === frame.message?.client_msg_id) {
@@ -649,11 +664,12 @@ function ChatPage() {
       sender_id: user.id,
       body: messageText.trim(),
       client_msg_id: clientMsgId,
-      seq: 0,
+      seq: latestSeqRef.current + 1,
       created_at: new Date().toISOString(),
       status: 'pending',
     };
 
+    pendingScrollRef.current = true;
     setMessages((current) => sortMessages([...current, optimistic]));
     pendingRef.current.set(clientMsgId, optimistic);
     scheduleRetry(optimistic);
@@ -768,7 +784,7 @@ function ChatPage() {
     <div className="shell">
       <header className="topbar">
         <div>
-          <button className="secondary" onClick={() => navigate('/')}>← Назад</button>
+          <button className="secondary" onClick={() => navigate('/')}>Назад</button>
           <h1>{headerTitle}</h1>
           <p>{status}</p>
         </div>
@@ -776,7 +792,7 @@ function ChatPage() {
 
       <div className="layout chat-layout">
         <section className="card chat-card">
-          <div className="messages">
+          <div className="messages" ref={messagesContainerRef}>
             {loading ? <p className="empty">Загрузка истории...</p> : null}
             {!loading && hasMoreHistory ? (
               <button type="button" className="secondary" onClick={() => void loadMoreHistory()} disabled={loadingMore}>
