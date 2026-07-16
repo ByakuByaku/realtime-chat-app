@@ -576,6 +576,13 @@ function ChatPage() {
 
         if (frame.type === 'message' && frame.message) {
           const incoming = frame.message;
+          const container = messagesContainerRef.current;
+          const wasNearBottom = container
+            ? container.scrollHeight - container.scrollTop - container.clientHeight <= 96
+            : true;
+          if (wasNearBottom) {
+            pendingScrollRef.current = true;
+          }
           setMessages((current) => {
             const existingIndex = current.findIndex((item) => {
               if (incoming.client_msg_id) {
