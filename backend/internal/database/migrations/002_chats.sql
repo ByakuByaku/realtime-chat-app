@@ -1,5 +1,5 @@
 --таблицы
-CREATE TABLE chats (
+CREATE TABLE IF NOT EXISTS chats (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     type            TEXT NOT NULL CHECK (type IN ('direct', 'group')),
     title           TEXT,
@@ -9,7 +9,7 @@ CREATE TABLE chats (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
  
-CREATE TABLE chat_members (
+CREATE TABLE IF NOT EXISTS chat_members (
     chat_id   UUID NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
     user_id   UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     role      TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('member', 'admin')),
@@ -67,6 +67,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trg_set_chat_direct_key ON chat_members;
 CREATE TRIGGER trg_set_chat_direct_key
 AFTER INSERT OR DELETE ON chat_members
 FOR EACH ROW
@@ -92,6 +93,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
  
+DROP TRIGGER IF EXISTS trg_prevent_remove_last_admin ON chat_members;
 CREATE TRIGGER trg_prevent_remove_last_admin
 BEFORE DELETE ON chat_members
 FOR EACH ROW

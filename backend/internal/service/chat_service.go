@@ -50,6 +50,14 @@ func (s *ChatService) AddMember(ctx context.Context, actorID, chatID, userID uui
 		role = defaultMemberRole
 	}
 
+	chat, err := s.chats.GetChatByID(ctx, chatID)
+	if err != nil {
+		return fmt.Errorf("get chat: %w", err)
+	}
+	if chat.CreatedBy != nil && *chat.CreatedBy == userID {
+		role = models.ChatRoleAdmin
+	}
+
 	if err := s.chats.AddMember(ctx, chatID, userID, role); err != nil {
 		return fmt.Errorf("add chat member: %w", err)
 	}
@@ -71,10 +79,42 @@ func (s *ChatService) RemoveMember(ctx context.Context, actorID, chatID, userID 
 	return nil
 }
 
+func (s *ChatService) DeleteChat(ctx context.Context, actorID, chatID uuid.UUID) error {
+	chat, err := s.chats.GetChatByID(ctx, chatID)
+	if err != nil {
+		return fmt.Errorf("get chat: %w", err)
+	}
+
+	if chat.Type == models.ChatTypeDirect {
+		member, err := s.IsMember(ctx, chatID, actorID)
+		if err != nil {
+			return err
+		}
+		if !member && (chat.CreatedBy == nil || *chat.CreatedBy != actorID) {
+			return ErrForbidden
+		}
+	} else if err := s.requireAdmin(ctx, chatID, actorID); err != nil {
+		return err
+	}
+
+	if err := s.chats.DeleteChat(ctx, chatID); err != nil {
+		return fmt.Errorf("delete chat: %w", err)
+	}
+
+	return nil
+}
+
 func (s *ChatService) requireAdmin(ctx context.Context, chatID, actorID uuid.UUID) error {
 	role, err := s.chats.GetMemberRole(ctx, chatID, actorID)
 	if err != nil {
 		if errors.Is(err, repository.ErrChatMemberNotFound) {
+			chat, chatErr := s.chats.GetChatByID(ctx, chatID)
+			if chatErr != nil {
+				return fmt.Errorf("get chat: %w", chatErr)
+			}
+			if chat.CreatedBy != nil && *chat.CreatedBy == actorID {
+				return nil
+			}
 			return ErrForbidden
 		}
 		return fmt.Errorf("get member role: %w", err)
@@ -106,4 +146,27 @@ func (s *ChatService) GetChats(ctx context.Context, userID uuid.UUID) ([]models.
 	}
 
 	return chats, nil
+}
+
+func (s *ChatService) GetMembers(ctx context.Context, actorID, chatID uuid.UUID) ([]models.ChatMemberInfo, error) {
+	member, err := s.IsMember(ctx, chatID, actorID)
+	if err != nil {
+		return nil, err
+	}
+	if !member {
+		chat, chatErr := s.chats.GetChatByID(ctx, chatID)
+		if chatErr != nil {
+			return nil, fmt.Errorf("get chat: %w", chatErr)
+		}
+		if chat.CreatedBy == nil || *chat.CreatedBy != actorID {
+			return nil, ErrForbidden
+		}
+	}
+
+	members, err := s.chats.GetChatMembers(ctx, chatID)
+	if err != nil {
+		return nil, fmt.Errorf("get chat members: %w", err)
+	}
+
+	return members, nil
 }

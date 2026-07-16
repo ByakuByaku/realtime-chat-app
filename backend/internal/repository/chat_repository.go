@@ -82,6 +82,29 @@ func (r *ChatRepository) RemoveMember(ctx context.Context, chatID, userID uuid.U
 	return nil
 }
 
+func (r *ChatRepository) DeleteChat(ctx context.Context, chatID uuid.UUID) error {
+	query := `
+		DELETE FROM chats
+		WHERE id = $1
+	`
+
+	result, err := r.db.ExecContext(ctx, query, chatID)
+	if err != nil {
+		return fmt.Errorf("delete chat: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("chat not found")
+	}
+
+	return nil
+}
+
 func (r *ChatRepository) GetMemberRole(ctx context.Context, chatID, userID uuid.UUID) (models.ChatRole, error) {
 	var role models.ChatRole
 
@@ -100,6 +123,60 @@ func (r *ChatRepository) GetMemberRole(ctx context.Context, chatID, userID uuid.
 	}
 
 	return role, nil
+}
+
+func (r *ChatRepository) GetChatMembers(ctx context.Context, chatID uuid.UUID) ([]models.ChatMemberInfo, error) {
+	query := `
+		WITH chat_users AS (
+			SELECT cm.chat_id, cm.user_id, cm.role, cm.joined_at
+			FROM chat_members cm
+			WHERE cm.chat_id = $1
+
+			UNION
+
+			SELECT c.id, c.created_by, 'admin', c.created_at
+			FROM chats c
+			WHERE c.id = $1
+				AND c.created_by IS NOT NULL
+				AND NOT EXISTS (
+					SELECT 1
+					FROM chat_members cm
+					WHERE cm.chat_id = c.id AND cm.user_id = c.created_by
+				)
+		)
+		SELECT cu.chat_id, cu.user_id, u.login, cu.role, cu.joined_at
+		FROM chat_users cu
+		INNER JOIN users u ON u.id = cu.user_id
+		ORDER BY u.login
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, chatID)
+	if err != nil {
+		return nil, fmt.Errorf("query chat members: %w", err)
+	}
+	defer rows.Close()
+
+	var members []models.ChatMemberInfo
+	for rows.Next() {
+		var member models.ChatMemberInfo
+		err := rows.Scan(
+			&member.ChatID,
+			&member.UserID,
+			&member.Login,
+			&member.Role,
+			&member.JoinedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("scan chat member: %w", err)
+		}
+		members = append(members, member)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows error: %w", err)
+	}
+
+	return members, nil
 }
 
 func (r *ChatRepository) GetChatByID(ctx context.Context, id uuid.UUID) (*models.Chat, error) {

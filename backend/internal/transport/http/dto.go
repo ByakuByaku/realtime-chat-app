@@ -54,7 +54,12 @@ type AddMemberRequest struct {
 type ChatMemberResponse struct {
 	ChatID uuid.UUID       `json:"chat_id"`
 	UserID uuid.UUID       `json:"user_id"`
+	Login  string          `json:"login,omitempty"`
 	Role   models.ChatRole `json:"role"`
+}
+
+type ChatMemberListResponse struct {
+	Items []ChatMemberResponse `json:"items"`
 }
 
 type SendMessageRequest struct {
@@ -103,6 +108,15 @@ func chatResponse(chat *models.Chat) ChatResponse {
 		CreatedBy:     chat.CreatedBy,
 		LastMessageAt: chat.LastMessageAt,
 		CreatedAt:     chat.CreatedAt,
+	}
+}
+
+func chatMemberResponse(member *models.ChatMemberInfo) ChatMemberResponse {
+	return ChatMemberResponse{
+		ChatID: member.ChatID,
+		UserID: member.UserID,
+		Login:  member.Login,
+		Role:   member.Role,
 	}
 }
 

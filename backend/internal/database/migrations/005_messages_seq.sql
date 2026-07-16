@@ -1,4 +1,4 @@
-ALTER TABLE messages ADD COLUMN seq BIGSERIAL;
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS seq BIGSERIAL;
 
-CREATE UNIQUE INDEX ux_messages_seq ON messages (seq);
-CREATE INDEX idx_messages_chat_seq ON messages (chat_id, seq);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_messages_seq ON messages (seq);
+CREATE INDEX IF NOT EXISTS idx_messages_chat_seq ON messages (chat_id, seq);

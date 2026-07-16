@@ -47,6 +47,8 @@ func (s *Server) registerPublicRoutes() {
 func (s *Server) registerProtectedRoutes() {
 	s.protected.HandleFunc("GET "+apiPrefix+"/chats", s.handleGetChats)
 	s.protected.HandleFunc("POST "+apiPrefix+"/chats", s.handleCreateChat)
+	s.protected.HandleFunc("DELETE "+apiPrefix+"/chats/{chat_id}", s.handleDeleteChat)
+	s.protected.HandleFunc("GET "+apiPrefix+"/chats/{chat_id}/members", s.handleGetMembers)
 	s.protected.HandleFunc("POST "+apiPrefix+"/chats/{chat_id}/members", s.handleAddMember)
 	s.protected.HandleFunc("DELETE "+apiPrefix+"/chats/{chat_id}/members/{user_id}", s.handleRemoveMember)
 	s.protected.HandleFunc("GET "+apiPrefix+"/chats/{chat_id}/messages", s.handleGetMessages)

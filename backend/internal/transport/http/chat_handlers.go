@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	"github.com/ByakuByaku/realtime-chat-app/backend/internal/middleware"
-	"github.com/ByakuByaku/realtime-chat-app/backend/internal/models"
 )
 
 func (s *Server) handleGetChats(w http.ResponseWriter, r *http.Request) {
@@ -67,6 +66,70 @@ func (s *Server) handleCreateChat(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, chatResponse(chat))
 }
 
+func (s *Server) handleDeleteChat(w http.ResponseWriter, r *http.Request) {
+	if !s.ensureMethod(w, r, http.MethodDelete) {
+		return
+	}
+	if s.chats == nil {
+		writeNotImplemented(w, "chat service is not configured")
+		return
+	}
+
+	actorID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeUnauthorized(w, "missing user context")
+		return
+	}
+
+	chatID, err := pathUUID(r, "chat_id")
+	if err != nil {
+		writeBadRequest(w, err.Error())
+		return
+	}
+
+	if err := s.chats.DeleteChat(r.Context(), actorID, chatID); err != nil {
+		handleServiceError(w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleGetMembers(w http.ResponseWriter, r *http.Request) {
+	if !s.ensureMethod(w, r, http.MethodGet) {
+		return
+	}
+	if s.chats == nil {
+		writeNotImplemented(w, "chat service is not configured")
+		return
+	}
+
+	actorID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeUnauthorized(w, "missing user context")
+		return
+	}
+
+	chatID, err := pathUUID(r, "chat_id")
+	if err != nil {
+		writeBadRequest(w, err.Error())
+		return
+	}
+
+	items, err := s.chats.GetMembers(r.Context(), actorID, chatID)
+	if err != nil {
+		handleServiceError(w, err)
+		return
+	}
+
+	response := ChatMemberListResponse{Items: make([]ChatMemberResponse, 0, len(items))}
+	for i := range items {
+		response.Items = append(response.Items, chatMemberResponse(&items[i]))
+	}
+
+	writeJSON(w, http.StatusOK, response)
+}
+
 func (s *Server) handleAddMember(w http.ResponseWriter, r *http.Request) {
 	if !s.ensureMethod(w, r, http.MethodPost) {
 		return
@@ -99,8 +162,17 @@ func (s *Server) handleAddMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Role == "" {
-		req.Role = models.ChatRoleMember
+	members, err := s.chats.GetMembers(r.Context(), actorID, chatID)
+	if err != nil {
+		handleServiceError(w, err)
+		return
+	}
+
+	for i := range members {
+		if members[i].UserID == req.UserID {
+			writeJSON(w, http.StatusCreated, chatMemberResponse(&members[i]))
+			return
+		}
 	}
 
 	writeJSON(w, http.StatusCreated, ChatMemberResponse{ChatID: chatID, UserID: req.UserID, Role: req.Role})

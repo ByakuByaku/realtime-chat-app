@@ -36,3 +36,11 @@ type ChatMember struct {
 	Role     ChatRole
 	JoinedAt time.Time
 }
+
+type ChatMemberInfo struct {
+	ChatID   uuid.UUID
+	UserID   uuid.UUID
+	Login    string
+	Role     ChatRole
+	JoinedAt time.Time
+}

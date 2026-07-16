@@ -1,5 +1,5 @@
 --таблицы
-CREATE TABLE messages (
+CREATE TABLE IF NOT EXISTS messages (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     chat_id       UUID NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
     sender_id     UUID REFERENCES users(id) ON DELETE SET NULL,
@@ -28,6 +28,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trg_check_sender_is_member ON messages;
 CREATE TRIGGER trg_check_sender_is_member
 BEFORE INSERT ON messages
 FOR EACH ROW
@@ -41,6 +42,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trg_update_chat_last_message ON messages;
 CREATE TRIGGER trg_update_chat_last_message
 AFTER INSERT ON messages
 FOR EACH ROW
