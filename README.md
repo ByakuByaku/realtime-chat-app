@@ -1,5 +1,7 @@
 # realtime-chat-app
 
+[Отчеты доступны по данной ссылке](.github)
+
 <img src="https://static.wikia.nocookie.net/logopedia/images/9/94/VK_Education.svg/revision/latest?cb=20230429123445" width="150" alt="VK Education">
 
 Мессенджер с чатами 1-на-1 и групповыми, доставкой сообщений в реальном времени через WebSocket, историей с пагинацией и поиском по тексту.
